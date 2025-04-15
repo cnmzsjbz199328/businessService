@@ -49,7 +49,8 @@ product-market-analysis/
 ├── public/           # Static assets
 └── mock/             # Mock data for development
 ```
-
+![1](image.png)
+![2](image-1.png)
 ## Data Flow
 1. **User Input**: Users enter keywords and parameters in the analysis form
 2. **Service Request**: Components call the analysis service
@@ -67,7 +68,7 @@ product-market-analysis/
 ### Installation
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/product-market-analysis.git
+   git clone https://github.com/cnmzsjbz199328/businessService.git
    cd product-market-analysis
    ```
 
