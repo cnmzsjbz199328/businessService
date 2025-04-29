@@ -16,8 +16,10 @@ export async function getMockAnalysisResponse(
   keyword: string,
   startDate: string,
   endDate: string,
-  videoCount: number,
-  commentCount: number
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  videoCount?: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  commentCount?: number
 ): Promise<AnalysisResult> {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -28,12 +30,15 @@ export async function getMockAnalysisResponse(
     k.toLowerCase().includes(normalizedKeyword) || normalizedKeyword.includes(k.toLowerCase())
   ) || "iPhone";
   
+  // 可以在这里使用 videoCount 和 commentCount 参数，如果需要的话
+  // 或者直接保留它们作为未来扩展使用
+  
   return {
     keyword: keyword,
     dateRange: `${startDate} - ${endDate}`,
-    trendData: mockTrendData[keywordMatch] || mockTrendData["iPhone"],
-    sentimentData: mockSentimentData[keywordMatch] || mockSentimentData["iPhone"],
-    analysis: mockAnalyses[keywordMatch] || mockAnalyses["iPhone"],
-    recommendations: mockRecommendations[keywordMatch] || mockRecommendations["iPhone"]
+    trendData: mockTrendData[keywordMatch as keyof typeof mockTrendData] || mockTrendData["iPhone"],
+    sentimentData: mockSentimentData[keywordMatch as keyof typeof mockSentimentData] || mockSentimentData["iPhone"],
+    analysis: mockAnalyses[keywordMatch as keyof typeof mockAnalyses] || mockAnalyses["iPhone"],
+    recommendations: mockRecommendations[keywordMatch as keyof typeof mockRecommendations] || mockRecommendations["iPhone"]
   };
 }

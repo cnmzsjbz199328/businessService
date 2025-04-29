@@ -2,7 +2,9 @@
  * Mock data for development and testing
  */
 
-export const mockTrendData = {
+export const mockTrendData: { 
+  [key: string]: { date: string; interest: number }[] 
+} = {
   "iPhone": [
     { date: "2023-01", interest: 45 },
     { date: "2023-02", interest: 50 },
@@ -37,7 +39,9 @@ export const mockTrendData = {
   ],
 };
 
-export const mockSentimentData = {
+export const mockSentimentData: {
+  [key: string]: { sentiment: string; value: number }[]
+} = {
   "iPhone": [
     { sentiment: "Positive", value: 45 },
     { sentiment: "Neutral", value: 35 },
@@ -60,7 +64,9 @@ export const mockSentimentData = {
   ],
 };
 
-export const mockRecommendations = {
+export const mockRecommendations: {
+  [key: string]: string[]
+} = {
   "iPhone": [
     "Focus on camera quality improvements",
     "Address battery life concerns in marketing",
@@ -83,7 +89,9 @@ export const mockRecommendations = {
   ],
 };
 
-export const mockAnalyses = {
+export const mockAnalyses: {
+  [key: string]: string
+} = {
   "iPhone": "Analysis shows iPhone has maintained strong interest with an upward trend. Positive sentiment dominates at 45%, primarily driven by camera quality and ecosystem integration. The 20% negative sentiment is mostly related to battery life and pricing concerns.",
   "Android": "Android devices show consistent growth in interest over the period. Sentiment is evenly split between positive and neutral (40% each), with positive comments focusing on customization and value. Negative sentiment (20%) relates mainly to update frequency and fragmentation.",
   "Laptop": "Laptop interest shows recovery after a dip in March. Strong positive sentiment (55%) reflects satisfaction with performance and features. Negative sentiment (15%) primarily concerns weight, battery life, and pricing.",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import TrendChart from '@/components/results/TrendChart';
@@ -8,7 +8,8 @@ import SentimentChart from '@/components/results/SentimentChart';
 import { analysisService } from '@/services/analysisService';
 import { AnalysisResult } from '@/services/types';
 
-export default function ResultsPage() {
+// 创建一个内部组件来使用 useSearchParams
+function ResultsContent() {
   const [results, setResults] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
@@ -33,7 +34,7 @@ export default function ResultsPage() {
         setResults(results);
       } catch (error) {
         console.error('Failed to fetch results:', error);
-        // Handle error state
+        // 处理错误状态
       } finally {
         setLoading(false);
       }
@@ -41,13 +42,46 @@ export default function ResultsPage() {
     
     fetchResults();
   }, [searchParams]);
-  
+
+  // 添加导出功能处理函数
   const handleExport = () => {
-    if (results) {
-      analysisService.exportAnalysisData(results);
-    }
+    if (!results) return;
+    
+    // 创建CSV格式的数据
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // 添加趋势数据
+    csvContent += "Trend Data\n";
+    csvContent += "Date,Interest\n";
+    results.trendData.forEach(item => {
+      csvContent += `${item.date},${item.interest}\n`;
+    });
+    
+    // 添加情感分析数据
+    csvContent += "\nSentiment Data\n";
+    csvContent += "Sentiment,Value\n";
+    results.sentimentData.forEach(item => {
+      csvContent += `${item.sentiment},${item.value}\n`;
+    });
+    
+    // 添加分析和建议
+    csvContent += `\nAnalysis\n${results.analysis}\n\n`;
+    csvContent += "Recommendations\n";
+    results.recommendations.forEach(rec => {
+      csvContent += `${rec}\n`;
+    });
+    
+    // 创建下载链接并触发下载
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${results.keyword}_analysis.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
-  
+
+  // 返回你现有的 JSX 内容
   if (loading) {
     return (
       <main className="min-h-screen py-8">
@@ -60,7 +94,7 @@ export default function ResultsPage() {
       </main>
     );
   }
-  
+
   if (!results) {
     return (
       <main className="min-h-screen py-8">
@@ -76,7 +110,7 @@ export default function ResultsPage() {
       </main>
     );
   }
-  
+
   return (
     <main className="min-h-screen py-8">
       <div className="container mx-auto px-4">
@@ -162,5 +196,19 @@ export default function ResultsPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// 主页面组件
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <span className="ml-3">Loading...</span>
+      </div>
+    }>
+      <ResultsContent />
+    </Suspense>
   );
 }
