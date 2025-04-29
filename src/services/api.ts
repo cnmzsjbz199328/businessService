@@ -1,52 +1,27 @@
 import { AnalysisParams, AnalysisResult } from './types';
 import { getMockAnalysisResponse } from '../simulation/mockResponses';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.example.com';
-const USE_MOCK_DATA = process.env.NODE_ENV === 'development';
-
 /**
  * API client for making requests to the backend
+ * 已简化为只使用模拟数据
  */
 export const apiClient = {
   /**
    * Get analysis results based on parameters
+   * 所有请求均返回模拟数据
    */
   async getAnalysisResults(params: AnalysisParams): Promise<AnalysisResult> {
-    if (USE_MOCK_DATA) {
-      return await getMockAnalysisResponse(
-        params.keyword,
-        params.startDate,
-        params.endDate,
-        params.videoCount,
-        params.commentCount
-      );
-    }
+    // 添加日志，调试用
+    console.log('API request params:', params);
+    console.log('Always using mock data');
     
-    try {
-      const formData = new FormData();
-      formData.append('keyword', params.keyword);
-      formData.append('startDate', params.startDate);
-      formData.append('endDate', params.endDate);
-      formData.append('videoCount', params.videoCount.toString());
-      formData.append('commentCount', params.commentCount.toString());
-      
-      if (params.file) {
-        formData.append('file', params.file);
-      }
-      
-      const response = await fetch(`${API_BASE_URL}/analysis`, {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-      
-      return await response.json() as AnalysisResult;
-    } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
-    }
+    // 直接返回模拟数据，不再尝试调用实际 API
+    return await getMockAnalysisResponse(
+      params.keyword,
+      params.startDate,
+      params.endDate,
+      params.videoCount,
+      params.commentCount
+    );
   }
 };

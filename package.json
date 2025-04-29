@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "cloudflare": "next build",
-    "start": "next start",
-    "lint": "next lint",
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "cloudflare": "CLOUDFLARE_PAGES=true next build",
+      "cloudflare:windows": "set CLOUDFLARE_PAGES=true&& next build",
+      "lint": "next lint",
     "tailwind-init": "tailwindcss init"
   },
   "dependencies": {

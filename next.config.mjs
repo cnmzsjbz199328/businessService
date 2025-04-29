@@ -1,8 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'export', // 保留这个设置用于生成静态文件
-  distDir: 'out', // 改为 'out' 或其他非保留名称
+  
+  // 根据环境变量决定配置
+  ...(process.env.CLOUDFLARE_PAGES === 'true' 
+    // Cloudflare Pages 环境配置
+    ? {
+        output: 'export', 
+        distDir: 'out', // Cloudflare 部署使用 out 目录
+      }
+    // 本地或其他环境配置
+    : {
+        // 使用默认的 .next 目录
+      }
+  ),
+  
   eslint: {
     ignoreDuringBuilds: true,
   },
