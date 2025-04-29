@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && next export",
-    "cloudflare": "next build && next export -o public",
+    "build": "next build",
+    "cloudflare": "next build",
     "start": "next start",
     "lint": "next lint",
     "tailwind-init": "tailwindcss init"
