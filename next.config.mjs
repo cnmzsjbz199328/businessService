@@ -2,17 +2,21 @@
 const nextConfig = {
   reactStrictMode: true,
   
+  // 设置环境变量
+  env: {
+    NEXT_PUBLIC_USE_MOCK_DATA: process.env.NEXT_PUBLIC_USE_MOCK_DATA || 'false',
+    NEXT_PUBLIC_GEMINI_API_URL: process.env.NEXT_PUBLIC_GEMINI_API_URL,
+    NEXT_PUBLIC_SENTIMENT_API_URL: process.env.NEXT_PUBLIC_SENTIMENT_API_URL,
+    NEXT_PUBLIC_TREND_API_URL: process.env.NEXT_PUBLIC_TREND_API_URL
+  },
+  
   // 根据环境变量决定配置
   ...(process.env.CLOUDFLARE_PAGES === 'true' 
-    // Cloudflare Pages 环境配置
     ? {
         output: 'export', 
-        distDir: 'out', // Cloudflare 部署使用 out 目录
+        distDir: 'out', 
       }
-    // 本地或其他环境配置
-    : {
-        // 使用默认的 .next 目录
-      }
+    : {}
   ),
   
   eslint: {
