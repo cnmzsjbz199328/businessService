@@ -15,6 +15,7 @@ export type AnalysisResult = {
   sentimentData: SentimentDataPoint[];
   analysis: string;
   recommendations: string[];
+  structuredAnalysis?: StructuredAnalysis;  // 添加这一行
 };
 
 export type AnalysisParams = {
@@ -32,8 +33,6 @@ export type SentimentResponse = {
   sentiment: number;
 };
 
-// ...现有代码...
-
 // 新增：趋势 API 响应类型
 export type TrendDataResponse = {
   date: string;
@@ -44,3 +43,12 @@ export type TrendDataResponse = {
     extracted_value: number;
   }[];
 }[];
+
+// 添加新的结构化分析类型
+export type StructuredAnalysis = {
+  overallAnalysis: string;
+  recommendation: string;
+  estimatedUnits: string;
+  considerations: string[];
+  disclaimer: string;
+};

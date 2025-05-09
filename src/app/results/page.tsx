@@ -43,7 +43,7 @@ function ResultsContent() {
     fetchResults();
   }, [searchParams]);
 
-  // 添加导出功能处理函数
+  // 修改 handleExport 函数
   const handleExport = () => {
     if (!results) return;
     
@@ -64,12 +64,37 @@ function ResultsContent() {
       csvContent += `${item.sentiment},${item.value}\n`;
     });
     
-    // 添加分析和建议
-    csvContent += `\nAnalysis\n${results.analysis}\n\n`;
-    csvContent += "Recommendations\n";
-    results.recommendations.forEach(rec => {
-      csvContent += `${rec}\n`;
-    });
+    // 添加结构化分析或旧格式的分析
+    if (results.structuredAnalysis) {
+      csvContent += "\nOverall Analysis\n";
+      csvContent += results.structuredAnalysis.overallAnalysis.replace(/,/g, ";") + "\n\n";
+      
+      csvContent += "Recommendation\n";
+      csvContent += results.structuredAnalysis.recommendation.replace(/,/g, ";") + "\n\n";
+      
+      csvContent += "Estimated Units\n";
+      csvContent += results.structuredAnalysis.estimatedUnits.replace(/,/g, ";") + "\n\n";
+      
+      if (results.structuredAnalysis.considerations.length > 0) {
+        csvContent += "Important Considerations\n";
+        results.structuredAnalysis.considerations.forEach(item => {
+          csvContent += `* ${item.replace(/,/g, ";")}\n`;
+        });
+        csvContent += "\n";
+      }
+      
+      if (results.structuredAnalysis.disclaimer) {
+        csvContent += "Disclaimer\n";
+        csvContent += results.structuredAnalysis.disclaimer.replace(/,/g, ";") + "\n";
+      }
+    } else {
+      // 原来的格式
+      csvContent += `\nAnalysis\n${results.analysis}\n\n`;
+      csvContent += "Recommendations\n";
+      results.recommendations.forEach(rec => {
+        csvContent += `${rec}\n`;
+      });
+    }
     
     // 创建下载链接并触发下载
     const encodedUri = encodeURI(csvContent);
@@ -171,18 +196,81 @@ function ResultsContent() {
             <p className="text-gray-500 dark:text-gray-400 text-sm">Comprehensive analysis and recommendations based on data</p>
           </div>
           <div className="p-4">
-            <div className="mb-4">
-              <h3 className="font-medium mb-2">Overall Analysis</h3>
-              <p className="text-gray-600 dark:text-gray-400">{results.analysis}</p>
-            </div>
-            <div>
-              <h3 className="font-medium mb-2">Recommendations</h3>
-              <ul className="list-inside text-gray-600 dark:text-gray-400">
-                {results.recommendations.map((rec, index) => (
-                  <li key={index} className="list-disc ml-4">{rec}</li>
-                ))}
-              </ul>
-            </div>
+            {results.structuredAnalysis ? (
+              <div className="space-y-6">
+                {/* 整体分析部分 */}
+                <div>
+                  <h3 className="font-medium text-lg mb-2">Overall Analysis</h3>
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      {results.structuredAnalysis.overallAnalysis}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* 推荐行动部分 */}
+                <div>
+                  <h3 className="font-medium text-lg mb-2">Recommendation</h3>
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      {results.structuredAnalysis.recommendation}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* 预估数量部分 */}
+                <div>
+                  <h3 className="font-medium text-lg mb-2">Estimated Units</h3>
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      {results.structuredAnalysis.estimatedUnits}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* 重要考虑因素部分 */}
+                {results.structuredAnalysis.considerations.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-lg mb-2">Important Considerations</h3>
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                      <ul className="list-disc pl-5 space-y-2">
+                        {results.structuredAnalysis.considerations.map((item, i) => (
+                          <li key={i} className="text-gray-700 dark:text-gray-300">{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+                
+                {/* 免责声明部分 */}
+                {results.structuredAnalysis.disclaimer && (
+                  <div>
+                    <h3 className="font-medium text-lg mb-2">Disclaimer</h3>
+                    <div className="bg-gray-100/50 dark:bg-gray-800/30 p-4 rounded-lg border-l-4 border-yellow-500">
+                      <p className="text-gray-600 dark:text-gray-400 text-sm italic">
+                        {results.structuredAnalysis.disclaimer}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* 现有的非结构化显示 */}
+                <div className="mb-4">
+                  <h3 className="font-medium mb-2">Overall Analysis</h3>
+                  <p className="text-gray-600 dark:text-gray-400">{results.analysis}</p>
+                </div>
+                <div>
+                  <h3 className="font-medium mb-2">Recommendations</h3>
+                  <ul className="list-inside text-gray-600 dark:text-gray-400">
+                    {results.recommendations.map((rec, index) => (
+                      <li key={index} className="list-disc ml-4">{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
           </div>
         </div>
         

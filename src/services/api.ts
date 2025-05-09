@@ -7,6 +7,8 @@ const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL || '/api/gemini';
 const SENTIMENT_API_URL = process.env.NEXT_PUBLIC_SENTIMENT_API_URL || '/api/sentiment';
 const TREND_API_URL = process.env.NEXT_PUBLIC_TREND_API_URL || '/api/trend';
 
+// 添加请求缓存
+const requestCache = new Map<string, Promise<AnalysisResult>>();
 
 /**
  * API client for making requests to the backend
@@ -16,9 +18,39 @@ export const apiClient = {
    * Get analysis results based on parameters
    */
   async getAnalysisResults(params: AnalysisParams): Promise<AnalysisResult> {
+    // 创建缓存键
+    const cacheKey = `${params.keyword}_${params.startDate}_${params.endDate}_${params.videoCount}_${params.commentCount}`;
+    
+    // 如果已有相同请求在进行中，返回缓存的Promise
+    if (requestCache.has(cacheKey)) {
+      console.log('Using cached request for:', params.keyword);
+      return requestCache.get(cacheKey)!;
+    }
+    
     // 添加日志，调试用
     console.log('API request params:', params);
     
+    // 创建请求Promise并缓存
+    const requestPromise = this._fetchAnalysisData(params);
+    requestCache.set(cacheKey, requestPromise);
+    
+    try {
+      // 等待请求完成
+      const result = await requestPromise;
+      return result;
+    } finally {
+      // 请求完成后删除缓存，以便下次可以重新请求
+      // 可选：如果想要保持缓存一段时间，可以使用setTimeout延迟删除
+      setTimeout(() => {
+        requestCache.delete(cacheKey);
+      }, 5000); // 5秒后删除缓存
+    }
+  },
+  
+  /**
+   * 内部方法：获取分析数据
+   */
+  async _fetchAnalysisData(params: AnalysisParams): Promise<AnalysisResult> {
     // 如果使用模拟数据，直接返回模拟响应
     if (USE_MOCK_DATA) {
       console.log('Using mock data');
@@ -145,13 +177,56 @@ export const apiClient = {
     // 4. 从 Gemini 响应中提取建议
     const recommendations = this.extractRecommendations(geminiText);
     
+    // 解析结构化响应
+    const structuredAnalysis = {
+      overallAnalysis: '',
+      recommendation: '',
+      estimatedUnits: '',
+      considerations: [] as string[],
+      disclaimer: ''
+    };
+    
+    // 提取 Overall Analysis 部分
+    const overallMatch = geminiText.match(/# Overall Analysis\s*([\s\S]*?)(?=# Recommendation|$)/i);
+    if (overallMatch && overallMatch[1]) {
+      structuredAnalysis.overallAnalysis = overallMatch[1].trim();
+    }
+    
+    // 提取 Recommendation 部分
+    const recMatch = geminiText.match(/# Recommendation\s*([\s\S]*?)(?=# Estimated Units|$)/i);
+    if (recMatch && recMatch[1]) {
+      structuredAnalysis.recommendation = recMatch[1].trim();
+    }
+    
+    // 提取 Estimated Units 部分
+    const unitsMatch = geminiText.match(/# Estimated Units\s*([\s\S]*?)(?=# Important Considerations|$)/i);
+    if (unitsMatch && unitsMatch[1]) {
+      structuredAnalysis.estimatedUnits = unitsMatch[1].trim();
+    }
+    
+    // 提取 Important Considerations 部分
+    const considerationsMatch = geminiText.match(/# Important Considerations\s*([\s\S]*?)(?=# Disclaimer|$)/i);
+    if (considerationsMatch && considerationsMatch[1]) {
+      structuredAnalysis.considerations = considerationsMatch[1]
+        .split(/\*\s+/)
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+    }
+    
+    // 提取 Disclaimer 部分
+    const disclaimerMatch = geminiText.match(/# Disclaimer\s*([\s\S]*?)$/i);
+    if (disclaimerMatch && disclaimerMatch[1]) {
+      structuredAnalysis.disclaimer = disclaimerMatch[1].trim();
+    }
+    
     return {
       keyword,
       dateRange: `${startDate} - ${endDate}`,
       trendData: processedTrendData,
       sentimentData: sentimentDistribution,
       analysis: geminiText,
-      recommendations
+      recommendations,
+      structuredAnalysis  // 添加结构化分析结果
     };
   },
   
