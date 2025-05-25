@@ -129,10 +129,24 @@ export const apiClient = {
     }));
     
     // 从推荐文本中提取结构化数据
+    console.log("Processing recommendation text for", keyword);
     const structuredAnalysis = this.extractStructuredAnalysis(data.recommendation);
     
     // 提取推荐建议列表
-    const recommendations = this.extractRecommendationsFromText(data.recommendation);
+    let recommendations = [];
+    if (structuredAnalysis.recommendation) {
+      // 尝试从结构化分析的推荐部分提取
+      const recItems = this.extractItemsFromText(structuredAnalysis.recommendation);
+      if (recItems.length > 0) {
+        recommendations = recItems;
+      } else {
+        // 回退到从正文提取
+        recommendations = this.extractRecommendationsFromText(data.recommendation);
+      }
+    } else {
+      // 回退到从正文提取
+      recommendations = this.extractRecommendationsFromText(data.recommendation);
+    }
     
     return {
       keyword,
@@ -146,43 +160,148 @@ export const apiClient = {
   },
   
   /**
+   * 提取文本中的特定部分
+   * @param text 原始文本
+   * @param start 开始标记
+   * @param end 结束标记 (可选)
+   */
+  extractSection(text: string, start: string, end?: string): string {
+    const startIndex = text.indexOf(start);
+    if (startIndex === -1) {
+      return '';
+    }
+    
+    const contentStart = startIndex + start.length;
+    
+    if (!end) {
+      return text.substring(contentStart).trim();
+    }
+    
+    const endIndex = text.indexOf(end, contentStart);
+    if (endIndex === -1) {
+      return text.substring(contentStart).trim();
+    }
+    
+    return text.substring(contentStart, endIndex).trim();
+  },
+  
+  /**
    * 从推荐文本中提取结构化分析
    */
   extractStructuredAnalysis(text: string): StructuredAnalysis {
+    // 输出原始文本以便调试
+    console.log("Original analysis text:", text);
+    
+    // 确定所有可能的节标题
+    const sections = [
+      { name: "overallAnalysis", markers: ["Overall Analysis", "Analysis Results:", "1. Analysis Results"] },
+      { name: "recommendation", markers: ["Recommendation", "2. Recommendation", "Stock Action:"] },
+      { name: "justification", markers: ["Justification", "3. Justification"] },
+      { name: "estimatedUnits", markers: ["Estimated Units", "4. Estimated Units"] },
+      { name: "importantConsiderations", markers: ["Important Considerations", "5. Important Considerations"] },
+      { name: "disclaimer", markers: ["Disclaimer", "Disclaimer:"] }
+    ];
+    
+    // 查找每个节的起始位置
+    const positions: {[key: string]: {index: number, marker: string}} = {};
+    
+    // 先标准化文本格式 - 确保每个部分前有空行
+    let normalizedText = text;
+    for (const section of sections) {
+      for (const marker of section.markers) {
+        // 查找不带数字的标题和带数字的标题
+        const plainMarker = marker.replace(/^\d+\.\s*/, '');
+        
+        // 替换各种格式的标题为标准格式
+        normalizedText = normalizedText
+          .replace(new RegExp(`(^|\\n)\\s*(\\d+\\.)?\\s*${plainMarker}\\s*:?\\s*`, 'g'), 
+                   `\n\n${plainMarker}\n`);
+      }
+    }
+    
+    // 再次进行处理以查找各节位置
+    for (const section of sections) {
+      for (const marker of section.markers) {
+        // 去掉数字前缀，保留关键字
+        const cleanMarker = marker.replace(/^\d+\.\s*/, '');
+        
+        // 在标准化文本中查找位置
+        const index = normalizedText.indexOf(`\n\n${cleanMarker}\n`);
+        if (index !== -1 && (!positions[section.name] || index < positions[section.name].index)) {
+          positions[section.name] = { index, marker: `\n\n${cleanMarker}\n` };
+        }
+      }
+    }
+    
+    console.log("Found sections:", Object.keys(positions));
+    
+    // 按位置排序节
+    const orderedSections = Object.entries(positions)
+      .sort((a, b) => a[1].index - b[1].index)
+      .map(([name, pos]) => ({ name, pos }));
+    
+    // 提取每个节的内容
+    const result: {[key: string]: string} = {};
+    
+    for (let i = 0; i < orderedSections.length; i++) {
+      const section = orderedSections[i];
+      const startPos = section.pos.index + section.pos.marker.length;
+      const endPos = i < orderedSections.length - 1 ? orderedSections[i + 1].pos.index : normalizedText.length;
+      
+      // 提取并清理文本
+      let content = normalizedText.substring(startPos, endPos).trim();
+      // 移除可能的数字前缀和空行
+      content = content
+        .replace(/^\s*\d+\.\s*/, '') // 移除开头的数字前缀
+        .replace(/\n{2,}/g, '\n')    // 压缩多个空行为一个
+        .trim();
+      
+      result[section.name] = content;
+    }
+    
+    // 特殊处理 considerations 列表
+    const considerations = this.extractConsiderationsList(
+      result.importantConsiderations || ""
+    );
+    
+    console.log("Extracted structured analysis:", {
+      overallAnalysis: result.overallAnalysis?.substring(0, 50) + "...",
+      recommendation: result.recommendation?.substring(0, 50) + "...",
+      estimatedUnits: result.estimatedUnits?.substring(0, 50) + "...",
+      considerations: considerations.length + " items",
+      disclaimer: result.disclaimer?.substring(0, 50) + "..."
+    });
+    
     return {
-      overallAnalysis: this.extractSection(text, "1. Analysis Results-", "2. Recommendation-"),
-      recommendation: this.extractSection(text, "2. Recommendation-", "3. Justification-"),
-      estimatedUnits: this.extractSection(text, "4. Estimated Units-", "5. Important Considerations-"),
-      considerations: this.extractConsiderations(text),
-      disclaimer: this.extractSection(text, "Disclaimer-", "")
+      overallAnalysis: result.overallAnalysis || "",
+      recommendation: result.recommendation || "",
+      estimatedUnits: result.estimatedUnits || "",
+      considerations: considerations,
+      disclaimer: result.disclaimer || ""
     };
   },
-  
-  /**
-   * 从文本中提取部分内容
-   */
-  extractSection(text: string, startMarker: string, endMarker: string): string {
-    const startIndex = text.indexOf(startMarker);
-    if (startIndex === -1) return '';
-    
-    const sectionStart = startIndex + startMarker.length;
-    const sectionEnd = endMarker ? text.indexOf(endMarker, sectionStart) : text.length;
-    
-    if (sectionEnd === -1) return text.substring(sectionStart).trim();
-    return text.substring(sectionStart, sectionEnd).trim();
-  },
-  
+
   /**
    * 提取考虑因素列表
    */
-  extractConsiderations(text: string): string[] {
-    const considerationsText = this.extractSection(text, "5. Important Considerations-", "Disclaimer-");
-    if (!considerationsText) return [];
+  extractConsiderationsList(text: string): string[] {
+    if (!text) return [];
     
-    return considerationsText
-      .split('-')
-      .map(item => item.trim())
-      .filter(item => item.length > 0);
+    // 使用正则表达式查找所有以 "-" 或 "•" 开头的项，或者以数字加点开头的项
+    const listItemRegex = /(?:^|\n)(?:\s*[-•]|\s*\d+\.\s*)(.*?)(?=\n\s*[-•]|\n\s*\d+\.\s*|$)/g;
+    const matches = Array.from(text.matchAll(listItemRegex));
+    
+    if (matches.length === 0) {
+      // 如果没有明确的列表标记，尝试按行分割，移除序号类前缀
+      return text
+        .split(/[\n\r]+/)
+        .map((line: string) => line.replace(/^\s*[\d\.\-•]+\s*/, '').trim())
+        .filter((line: string) => line.length > 5); // 过滤掉太短的行
+    }
+    
+    return matches
+      .map((match: RegExpMatchArray) => match[1].trim())
+      .filter((item: string) => item.length > 0);
   },
   
   /**
@@ -203,8 +322,30 @@ export const apiClient = {
     // 将justification部分按短句分割
     return justificationSection
       .split('.')
-      .map(item => item.trim())
-      .filter(item => item.length > 0 && item.charAt(0) === '-')
-      .map(item => item.substring(1).trim());
+      .map((item: string) => item.trim())
+      .filter((item: string) => item.length > 0 && item.charAt(0) === '-')
+      .map((item: string) => item.substring(1).trim());
+  },
+
+  /**
+   * 从文本中提取列表项
+   */
+  extractItemsFromText(text: string): string[] {
+    // 修复: 移除 /s 标志，使用兼容性更好的正则表达式
+    // 使用正则表达式查找所有以 "-" 或 "•" 开头的项，或者以数字加点开头的项
+    const listItemRegex = /(?:^|\n)(?:\s*[-•]|\s*\d+\.\s*)(.*?)(?=\n\s*[-•]|\n\s*\d+\.\s*|$)/g;
+    const matches = Array.from(text.matchAll(listItemRegex));
+    
+    if (matches.length === 0) {
+      // 如果没有明确的列表标记，尝试将短句作为单独的项
+      return text
+        .split(/[\.!\?]/)
+        .map((sentence: string) => sentence.trim())
+        .filter((sentence: string) => sentence.length > 10);
+    }
+    
+    return matches
+      .map((match: RegExpMatchArray) => match[1].trim())
+      .filter((item: string) => item.length > 0);
   }
 };
