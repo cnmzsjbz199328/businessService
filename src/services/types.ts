@@ -92,3 +92,36 @@ export type GeminiResponse = {
   };
   recommendation: string;
 };
+
+// 产品库存数据类型
+export type ProductInventoryData = {
+  "Beginning Inventory": number;
+  "COGS": number;
+  "Ending Inventory": number;
+  "Sales": number;
+  "Target Turnover": number;
+  "id": string;
+  "period": string;
+};
+
+// 产品数据上传请求类型
+export type ProductUploadRequest = {
+  [productName: string]: ProductInventoryData;
+};
+
+// 产品数据上传响应类型
+export type ProductUploadResponse = {
+  message: string;
+  data: ProductInventoryData[];
+};
+
+// 解析后的文件数据类型
+export type ParsedFileData = {
+  beginningInventory: number;
+  cogs: number;
+  endingInventory: number;
+  sales: number;
+  targetTurnover: number;
+  period: string;
+  id?: string;
+};

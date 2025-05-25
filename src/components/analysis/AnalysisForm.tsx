@@ -8,14 +8,25 @@ import styles from './AnalysisForm.module.css';
 export default function AnalysisForm() {
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [videoCount, setVideoCount] = useState(50);
   const [commentCount, setCommentCount] = useState(100);
+  const [fileValid, setFileValid] = useState(false);
+  const [autoUpload] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  
+  // 设置默认的开始日期和结束日期
+  const defaultStartDate = "2025-01-01";
+  const defaultEndDate = "2025-05-01";
+  const defaultKeyword = "iphone 16 pro max";
   
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    setFileError("");
+    setUploadSuccess(false);
 
     const formData = new FormData(e.currentTarget);
     
@@ -32,6 +43,11 @@ export default function AnalysisForm() {
       router.push(`/results?keyword=${formData.get('keyword')}&startDate=${formData.get('startDate')}&endDate=${formData.get('endDate')}&videoCount=${formData.get('videoCount')}&commentCount=${formData.get('commentCount')}`);
     } catch (error) {
       console.error('Analysis request failed:', error);
+      if (error instanceof Error) {
+        setFileError(error.message);
+      } else {
+        setFileError("An unknown error occurred during analysis.");
+      }
     } finally {
       setLoading(false);
     }
@@ -39,7 +55,87 @@ export default function AnalysisForm() {
 
   const handleFileChange = () => {
     if (fileInputRef.current?.files?.length) {
-      setFileName(fileInputRef.current.files[0].name);
+      const file = fileInputRef.current.files[0];
+      console.log('[AnalysisForm] File selected:', {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      });
+      
+      setFileName(file.name);
+      setFileError("");
+      setUploadSuccess(false);
+      
+      // 验证文件类型
+      if (!file.name.endsWith('.json')) {
+        console.log('[AnalysisForm] File type error: Not a JSON file');
+        setFileError("Only JSON files are supported for product data upload.");
+        setFileValid(false);
+        return;
+      }
+      
+      // 验证文件大小 (限制为2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        console.log('[AnalysisForm] File size error: Exceeds 2MB limit');
+        setFileError('File size exceeds the limit (2MB).');
+        setFileValid(false);
+        return;
+      }
+      
+      setFileValid(true);
+      console.log('[AnalysisForm] File validation passed. Ready for upload.');
+      
+      if (autoUpload) {
+        console.log('[AnalysisForm] Auto-upload enabled, triggering upload...');
+        // 延迟一点点时间，确保UI状态先更新
+        setTimeout(() => handleUploadOnly(), 100);
+      }
+    } else {
+      setFileValid(false);
+      console.log('[AnalysisForm] No file selected or file selection cancelled');
+    }
+  };
+  
+  const handleUploadOnly = async () => {
+    if (!fileInputRef.current?.files?.length) {
+      setFileError("Please select a file to upload");
+      return;
+    }
+    
+    setLoading(true);
+    setFileError("");
+    setUploadSuccess(false);
+    
+    try {
+      const file = fileInputRef.current.files[0];
+      const keyword = document.getElementById('keyword') as HTMLInputElement;
+      
+      console.log('[AnalysisForm] Starting upload for file:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        keyword: keyword.value
+      });
+      
+      if (!keyword || !keyword.value) {
+        setFileError("Please enter a product keyword");
+        setLoading(false);
+        return;
+      }
+      
+      console.log('[AnalysisForm] Calling analysisService.uploadProductData');
+      const result = await analysisService.uploadProductData(file, keyword.value);
+      console.log('[AnalysisForm] Upload completed successfully:', result);
+      setUploadSuccess(true);
+    } catch (error) {
+      console.error('[AnalysisForm] File upload failed:', error);
+      if (error instanceof Error) {
+        setFileError(error.message);
+      } else {
+        setFileError("An unknown error occurred during file upload.");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -54,7 +150,8 @@ export default function AnalysisForm() {
               id="keyword" 
               name="keyword" 
               className={styles.input}
-              placeholder="Enter keyword to analyze" 
+              placeholder="Enter keyword to analyze"
+              defaultValue={defaultKeyword}
               required 
             />
             <p className={styles.helpText}>Enter keyword or phrase you want to analyze</p>
@@ -69,7 +166,7 @@ export default function AnalysisForm() {
                   <polyline points="17 8 12 3 7 8"></polyline>
                   <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
-                Choose File
+                Choose JSON File
               </label>
               <input 
                 type="file" 
@@ -78,10 +175,47 @@ export default function AnalysisForm() {
                 className={styles.fileUploadInput}
                 ref={fileInputRef}
                 onChange={handleFileChange}
+                accept=".json"
               />
               <span className={styles.fileName}>{fileName}</span>
+              
+              {(fileName && fileValid) && (
+                <button 
+                  type="button" 
+                  onClick={handleUploadOnly} 
+                  className={styles.uploadButton}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className={styles.smallSpinner}></span>
+                      Uploading...
+                    </>
+                  ) : 'Upload Only'}
+                </button>
+              )}
             </div>
-            <p className={styles.helpText}>Upload company-related data (PDF, DOCX, XLSX formats supported)</p>
+            {fileError && <p className={styles.errorText}>{fileError}</p>}
+            {uploadSuccess && <p className={styles.successText}>File uploaded successfully!</p>}
+            <p className={styles.helpText}>Upload product inventory data in JSON format</p>
+            <div className={styles.jsonSample}>
+              <details>
+                <summary>Required JSON format</summary>
+                <pre>
+                  {`{
+  "${defaultKeyword}": {
+    "Beginning Inventory": 182,
+    "COGS": 73857.29,
+    "Ending Inventory": 40,
+    "Sales": 142,
+    "Target Turnover": 1000,
+    "id": "INV2025-01-iphone",
+    "period": "2025-01"
+  }
+}`}
+                </pre>
+              </details>
+            </div>
           </div>
 
           <div className={styles.dateContainer}>
@@ -92,7 +226,7 @@ export default function AnalysisForm() {
                 id="startDate" 
                 name="startDate" 
                 className={styles.input}
-                defaultValue={new Date(new Date().setMonth(new Date().getMonth() - 6)).toISOString().split('T')[0]}
+                defaultValue={defaultStartDate}
                 required 
               />
             </div>
@@ -103,7 +237,7 @@ export default function AnalysisForm() {
                 id="endDate" 
                 name="endDate" 
                 className={styles.input}
-                defaultValue={new Date().toISOString().split('T')[0]}
+                defaultValue={defaultEndDate}
                 required 
               />
             </div>
@@ -140,6 +274,7 @@ export default function AnalysisForm() {
             />
             <p className={styles.helpText}>Set the number of comments to analyze per video (50-500)</p>
           </div>
+
 
           <button 
             type="submit" 

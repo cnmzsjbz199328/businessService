@@ -3,7 +3,7 @@ import { getMockAnalysisResponse } from '../simulation/mockResponses';
 
 // 直接从 process.env 获取环境变量
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
-const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL || 'https://badtom.dpdns.org/gemini';
+const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL;
 const CACHE_EXPIRY_MS = 5000; // 缓存过期时间，可以后续移到环境变量
 
 // 添加请求缓存
@@ -62,6 +62,11 @@ export const apiClient = {
     }
     
     try {
+      // 检查API URL是否已定义
+      if (!GEMINI_API_URL) {
+        throw new Error('GEMINI_API_URL is not defined in environment variables');
+      }
+      
       // 请求 Gemini API
       const response = await fetch(GEMINI_API_URL, {
         method: 'POST',
