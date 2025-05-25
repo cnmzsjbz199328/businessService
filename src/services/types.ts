@@ -8,6 +8,14 @@ export type SentimentDataPoint = {
   value: number;
 };
 
+export type StructuredAnalysis = {
+  overallAnalysis: string;
+  recommendation: string;
+  estimatedUnits: string;
+  considerations: string[];
+  disclaimer: string;
+};
+
 export type AnalysisResult = {
   keyword: string;
   dateRange: string;
@@ -15,7 +23,7 @@ export type AnalysisResult = {
   sentimentData: SentimentDataPoint[];
   analysis: string;
   recommendations: string[];
-  structuredAnalysis?: StructuredAnalysis;  // 添加这一行
+  structuredAnalysis?: StructuredAnalysis;
 };
 
 export type AnalysisParams = {
@@ -27,28 +35,60 @@ export type AnalysisParams = {
   file?: File;
 };
 
-// 新增：情感分析 API 响应类型
-export type SentimentResponse = {
-  comment: string;
-  sentiment: number;
-};
-
-// 新增：趋势 API 响应类型
-export type TrendDataResponse = {
-  date: string;
-  timestamp: string;
-  values: {
-    query: string;
-    value: string;
-    extracted_value: number;
-  }[];
-}[];
-
-// 添加新的结构化分析类型
-export type StructuredAnalysis = {
-  overallAnalysis: string;
+// 只保留统一 API 响应的类型定义
+export type GeminiResponse = {
+  analysis: {
+    input: {
+      product: string;
+      startDate: string;
+      endDate: string;
+      videoCount: number;
+      commentCount: number;
+    };
+    inventory: Array<{
+      "Beginning Inventory": number;
+      "COGS": number;
+      "Ending Inventory": number;
+      "Sales": number;
+      "Target Turnover": number;
+      "id": string;
+      "period": string;
+    }>;
+    trend: {
+      trend: {
+        start_value: number;
+        end_value: number;
+        percent_change: number;
+        trend: string;
+      };
+      timeline: Array<{
+        date: string;
+        timestamp: string;
+        values: Array<{
+          query: string;
+          value: string;
+          extracted_value: number;
+        }>;
+      }>;
+    };
+    sentiment: {
+      summary: {
+        clearly_positive: number;
+        clearly_negative: number;
+        neutral: number;
+        mixed: number;
+      };
+      chartData: Array<{
+        label: string;
+        value: number;
+      }>;
+      comments: Array<{
+        comment: string;
+        sentiment_score: number;
+        sentiment_magnitude: number;
+        sentiment: string;
+      }>;
+    };
+  };
   recommendation: string;
-  estimatedUnits: string;
-  considerations: string[];
-  disclaimer: string;
 };

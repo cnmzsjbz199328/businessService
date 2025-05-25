@@ -1,11 +1,10 @@
-import { AnalysisParams, AnalysisResult, SentimentResponse, TrendDataResponse } from './types';
+import { AnalysisParams, AnalysisResult, GeminiResponse, StructuredAnalysis } from './types';
 import { getMockAnalysisResponse } from '../simulation/mockResponses';
 
-// 获取环境变量
+// 直接从 process.env 获取环境变量
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
-const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL || '/api/gemini';
-const SENTIMENT_API_URL = process.env.NEXT_PUBLIC_SENTIMENT_API_URL || '/api/sentiment';
-const TREND_API_URL = process.env.NEXT_PUBLIC_TREND_API_URL || '/api/trend';
+const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL || 'https://badtom.dpdns.org/gemini';
+const CACHE_EXPIRY_MS = 5000; // 缓存过期时间，可以后续移到环境变量
 
 // 添加请求缓存
 const requestCache = new Map<string, Promise<AnalysisResult>>();
@@ -40,10 +39,9 @@ export const apiClient = {
       return result;
     } finally {
       // 请求完成后删除缓存，以便下次可以重新请求
-      // 可选：如果想要保持缓存一段时间，可以使用setTimeout延迟删除
       setTimeout(() => {
         requestCache.delete(cacheKey);
-      }, 5000); // 5秒后删除缓存
+      }, CACHE_EXPIRY_MS);
     }
   },
   
@@ -64,8 +62,8 @@ export const apiClient = {
     }
     
     try {
-      // 1. 获取 Gemini 分析数据
-      const geminiResponse = await fetch(GEMINI_API_URL, {
+      // 请求 Gemini API
+      const response = await fetch(GEMINI_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,66 +71,22 @@ export const apiClient = {
         body: JSON.stringify({
           product: params.keyword,
           startDate: params.startDate,
-          endDate: params.endDate
+          endDate: params.endDate,
+          videoCount: params.videoCount || 20,
+          commentCount: params.commentCount || 20
         })
       });
       
-      if (!geminiResponse.ok) {
-        throw new Error(`Gemini API error: ${geminiResponse.status}`);
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
       }
       
-      const geminiData = await geminiResponse.text();
-      console.log('Gemini API response:', geminiData);
+      const data = await response.json() as GeminiResponse;
+      console.log('Gemini API response:', data);
       
-      // 2. 获取趋势数据
-      const trendResponse = await fetch(TREND_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          product: params.keyword,
-          startDate: params.startDate,
-          endDate: params.endDate
-        })
-      });
+      // 处理返回的数据
+      return this.processGeminiResponse(params.keyword, params.startDate, params.endDate, data);
       
-      if (!trendResponse.ok) {
-        throw new Error(`Trend API error: ${trendResponse.status}`);
-      }
-      
-      const trendData = await trendResponse.json() as TrendDataResponse;
-      console.log('Trend API response:', trendData);
-      
-      // 3. 获取情感分析数据
-      const sentimentResponse = await fetch(SENTIMENT_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          topic: params.keyword,
-          searchMaxResults: params.videoCount || 5,
-          commentMaxResults: params.commentCount || 10
-        })
-      });
-      
-      if (!sentimentResponse.ok) {
-        throw new Error(`Sentiment API error: ${sentimentResponse.status}`);
-      }
-      
-      const sentimentData = await sentimentResponse.json() as SentimentResponse[];
-      console.log('Sentiment API response:', sentimentData);
-      
-      // 4. 处理数据，生成分析结果
-      return this.processApiResponses(
-        params.keyword, 
-        params.startDate, 
-        params.endDate, 
-        geminiData, 
-        sentimentData,
-        trendData
-      );
     } catch (error) {
       console.error('API request failed:', error);
       
@@ -149,188 +103,91 @@ export const apiClient = {
   },
   
   /**
-   * 处理 API 响应，生成分析结果
+   * Process the unified Gemini response
    */
-  processApiResponses(
+  processGeminiResponse(
     keyword: string, 
     startDate: string, 
     endDate: string, 
-    geminiText: string, 
-    sentimentData: SentimentResponse[],
-    trendData: TrendDataResponse
+    data: GeminiResponse
   ): AnalysisResult {
-    // 1. 从 Gemini 响应中提取关键信息
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const sentimentMatch = geminiText.match(/Sentiment:\s*(.*?)\s*\(/i);
-    const trendMatch = geminiText.match(/Trend:\s*(.*?)\s*\(/i);
+    // 转换趋势数据
+    const trendData = data.analysis.trend.timeline.map((item) => ({
+      date: item.date,
+      interest: item.values[0].extracted_value
+    }));
     
-    // 获取趋势值用于日志记录
-    const trendDescription = trendMatch ? trendMatch[1].trim() : 'Stable';
-    console.log('Extracted trend description:', trendDescription);
+    // 转换情感数据
+    const sentimentData = data.analysis.sentiment.chartData.map((item) => ({
+      sentiment: item.label.charAt(0).toUpperCase() + item.label.slice(1).replace('_', ' '),
+      value: item.value
+    }));
     
-    // 2. 处理情感数据，计算情感分布
-    const sentimentDistribution = this.calculateSentimentDistribution(sentimentData);
+    // 从推荐文本中提取结构化数据
+    const structuredAnalysis = this.extractStructuredAnalysis(data.recommendation);
     
-    // 3. 处理API返回的趋势数据
-    const processedTrendData = this.processTrendData(trendData);
-    
-    // 4. 从 Gemini 响应中提取建议
-    const recommendations = this.extractRecommendations(geminiText);
-    
-    // 解析结构化响应
-    const structuredAnalysis = {
-      overallAnalysis: '',
-      recommendation: '',
-      estimatedUnits: '',
-      considerations: [] as string[],
-      disclaimer: ''
-    };
-    
-    // 提取 Overall Analysis 部分
-    const overallMatch = geminiText.match(/# Overall Analysis\s*([\s\S]*?)(?=# Recommendation|$)/i);
-    if (overallMatch && overallMatch[1]) {
-      structuredAnalysis.overallAnalysis = overallMatch[1].trim();
-    }
-    
-    // 提取 Recommendation 部分
-    const recMatch = geminiText.match(/# Recommendation\s*([\s\S]*?)(?=# Estimated Units|$)/i);
-    if (recMatch && recMatch[1]) {
-      structuredAnalysis.recommendation = recMatch[1].trim();
-    }
-    
-    // 提取 Estimated Units 部分
-    const unitsMatch = geminiText.match(/# Estimated Units\s*([\s\S]*?)(?=# Important Considerations|$)/i);
-    if (unitsMatch && unitsMatch[1]) {
-      structuredAnalysis.estimatedUnits = unitsMatch[1].trim();
-    }
-    
-    // 提取 Important Considerations 部分
-    const considerationsMatch = geminiText.match(/# Important Considerations\s*([\s\S]*?)(?=# Disclaimer|$)/i);
-    if (considerationsMatch && considerationsMatch[1]) {
-      structuredAnalysis.considerations = considerationsMatch[1]
-        .split(/\*\s+/)
-        .map(item => item.trim())
-        .filter(item => item.length > 0);
-    }
-    
-    // 提取 Disclaimer 部分
-    const disclaimerMatch = geminiText.match(/# Disclaimer\s*([\s\S]*?)$/i);
-    if (disclaimerMatch && disclaimerMatch[1]) {
-      structuredAnalysis.disclaimer = disclaimerMatch[1].trim();
-    }
+    // 提取推荐建议列表
+    const recommendations = this.extractRecommendationsFromText(data.recommendation);
     
     return {
       keyword,
       dateRange: `${startDate} - ${endDate}`,
-      trendData: processedTrendData,
-      sentimentData: sentimentDistribution,
-      analysis: geminiText,
+      trendData,
+      sentimentData,
+      analysis: data.recommendation,
       recommendations,
-      structuredAnalysis  // 添加结构化分析结果
+      structuredAnalysis
     };
   },
   
   /**
-   * 处理趋势 API 数据
+   * 从推荐文本中提取结构化分析
    */
-  processTrendData(data: TrendDataResponse): { date: string; interest: number }[] {
-    return data.map(item => {
-      // 提取感兴趣的数据
-      const value = item.values[0].extracted_value;
-      // 格式化日期为 YYYY-MM-DD 格式，与组件期望格式一致
-      const dateParts = item.date.split(' ');
-      let month: string;
-      
-      // 处理月份格式
-      switch (dateParts[0]) {
-        case 'Jan': month = '01'; break;
-        case 'Feb': month = '02'; break;
-        case 'Mar': month = '03'; break;
-        case 'Apr': month = '04'; break;
-        case 'May': month = '05'; break;
-        case 'Jun': month = '06'; break;
-        case 'Jul': month = '07'; break;
-        case 'Aug': month = '08'; break;
-        case 'Sep': month = '09'; break;
-        case 'Oct': month = '10'; break;
-        case 'Nov': month = '11'; break;
-        case 'Dec': month = '12'; break;
-        default: month = '01';
-      }
-      
-      // 处理日期格式
-      const day = dateParts[1].replace(',', '').padStart(2, '0');
-      const year = dateParts[2];
-      const formattedDate = `${year}-${month}-${day}`;
-      
-      return {
-        date: formattedDate,
-        interest: value
-      };
-    });
+  extractStructuredAnalysis(text: string): StructuredAnalysis {
+    return {
+      overallAnalysis: this.extractSection(text, "1. Analysis Results-", "2. Recommendation-"),
+      recommendation: this.extractSection(text, "2. Recommendation-", "3. Justification-"),
+      estimatedUnits: this.extractSection(text, "4. Estimated Units-", "5. Important Considerations-"),
+      considerations: this.extractConsiderations(text),
+      disclaimer: this.extractSection(text, "Disclaimer-", "")
+    };
   },
   
   /**
-   * 计算情感分布
+   * 从文本中提取部分内容
    */
-  calculateSentimentDistribution(data: SentimentResponse[]): { sentiment: string; value: number }[] {
-    // 初始化计数器
-    let positive = 0;
-    let neutral = 0;
-    let negative = 0;
+  extractSection(text: string, startMarker: string, endMarker: string): string {
+    const startIndex = text.indexOf(startMarker);
+    if (startIndex === -1) return '';
     
-    // 统计情感分布
-    data.forEach(item => {
-      const sentiment = item.sentiment;
-      if (sentiment > 0) {
-        positive++;
-      } else if (sentiment < 0) {
-        negative++;
-      } else {
-        neutral++;
-      }
-    });
+    const sectionStart = startIndex + startMarker.length;
+    const sectionEnd = endMarker ? text.indexOf(endMarker, sectionStart) : text.length;
     
-    // 计算百分比
-    const total = data.length || 1; // 避免除以零
-    
-    return [
-      { sentiment: "Positive", value: Math.round((positive / total) * 100) },
-      { sentiment: "Neutral", value: Math.round((neutral / total) * 100) },
-      { sentiment: "Negative", value: Math.round((negative / total) * 100) }
-    ];
+    if (sectionEnd === -1) return text.substring(sectionStart).trim();
+    return text.substring(sectionStart, sectionEnd).trim();
   },
   
   /**
-   * 从 Gemini 响应中提取建议
+   * 提取考虑因素列表
    */
-  extractRecommendations(text: string): string[] {
-    const recommendations: string[] = [];
+  extractConsiderations(text: string): string[] {
+    const considerationsText = this.extractSection(text, "5. Important Considerations-", "Disclaimer-");
+    if (!considerationsText) return [];
     
-    // 尝试提取 "Recommendation:" 后面的内容
-    const mainRec = text.match(/Recommendation:\s*(.*?)(?:\n|$)/i);
-    if (mainRec && mainRec[1]) {
-      recommendations.push(mainRec[1].trim());
-    }
-    
-    // 尝试提取 "Important Considerations:" 后面的要点
-    // 修复 "s" 标志兼容性问题，使用多行匹配的替代方案
-    const considerationsRegex = /Important Considerations:([\s\S]*?)(?:Disclaimer:|$)/i;
-    const considerations = text.match(considerationsRegex);
-    
-    if (considerations && considerations[1]) {
-      // 提取每个要点
-      const points = considerations[1].split(/\n\s*\*\s*/).filter(p => p.trim());
-      points.forEach(point => {
-        const cleanPoint = point.replace(/^\s*[-*]\s*/, '').trim();
-        if (cleanPoint && !cleanPoint.includes('Important Considerations')) {
-          recommendations.push(cleanPoint);
-        }
-      });
-    }
-    
-    // 确保至少有三条建议
-    if (recommendations.length === 0) {
+    return considerationsText
+      .split('-')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+  },
+  
+  /**
+   * 从推荐文本中提取建议
+   */
+  extractRecommendationsFromText(text: string): string[] {
+    // 尝试提取 "3. Justification-" 后面的内容
+    const justificationSection = this.extractSection(text, "3. Justification-", "4. Estimated Units-");
+    if (!justificationSection) {
+      // 如果没找到，返回默认建议
       return [
         "Review market trends for potential shifts",
         "Monitor competitor activities",
@@ -338,6 +195,11 @@ export const apiClient = {
       ];
     }
     
-    return recommendations;
+    // 将justification部分按短句分割
+    return justificationSection
+      .split('.')
+      .map(item => item.trim())
+      .filter(item => item.length > 0 && item.charAt(0) === '-')
+      .map(item => item.substring(1).trim());
   }
 };

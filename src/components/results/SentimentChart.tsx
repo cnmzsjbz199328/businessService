@@ -44,7 +44,8 @@ export default function SentimentChart({ data }: SentimentChartProps) {
           backgroundColor: [
             '#22c55e', // Positive - green
             '#3b82f6', // Neutral - blue
-            '#ef4444'  // Negative - red
+            '#ef4444', // Negative - red
+            '#f59e0b' // Mixed - yellow
           ],
           borderColor: isDarkMode ? '#1f2937' : '#fff',
           borderWidth: 2

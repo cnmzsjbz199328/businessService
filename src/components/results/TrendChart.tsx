@@ -49,9 +49,9 @@ export default function TrendChart({ data }: TrendChartProps) {
           fill: true,
           pointBackgroundColor: '#3b82f6',
           pointBorderColor: '#fff',
-          pointBorderWidth: 2,
-          pointRadius: 4,
-          pointHoverRadius: 6
+          pointBorderWidth: 0.5,
+          pointRadius: 1,
+          pointHoverRadius: 2
         }]
       },
       options: {
