@@ -34,7 +34,7 @@ export default function Header() {
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center gap-2">
               <Image
-                src="/ainventory logo.png" // 确保路径正确
+                src="/ainventory-logo.png" // 确保路径正确
                 alt="AIventory Logo"
                 width={200}
                 height={200}
