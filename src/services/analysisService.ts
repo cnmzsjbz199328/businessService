@@ -11,12 +11,18 @@ export const analysisService = {
    */
   async requestAnalysis(params: AnalysisParams): Promise<AnalysisResult> {
     try {
-      // 如果有上传文件，先处理文件上传
-      if (params.file) {
-        await productDataService.uploadProductData(params.file, params.keyword);
-      }
+      // 移除这里的上传文件逻辑。
+      // 文件上传应该只通过 AnalysisForm 中的 handleFileChange -> handleUploadOnly 路径触发。
+      // if (params.file) {
+      //   console.log('[AnalysisService] Uploading file with product name:', params.keyword);
+      //   await productDataService.uploadProductData(params.file, params.keyword);
+      // }
       
-      return await apiClient.getAnalysisResults(params);
+      // 直接进行分析请求，假设文件（如果已选择）已通过自动上传处理
+      console.log('[AnalysisService] Requesting analysis with keyword:', params.keyword);
+      // 注意：这里将 params.file 移除，因为 analysisService.requestAnalysis 不再处理文件上传
+      const { ...analysisParams } = params; 
+      return await apiClient.getAnalysisResults(analysisParams);
     } catch (error) {
       console.error('Analysis request failed:', error);
       throw error;
@@ -24,9 +30,10 @@ export const analysisService = {
   },
   
   /**
-   * 直接调用产品数据上传服务
+   * 直接调用产品数据上传服务 (此方法由 AnalysisForm 中的 handleUploadOnly 调用)
    */
   uploadProductData(file: File, productName: string): Promise<ProductUploadResponse> {
+    console.log('[AnalysisService] Calling productDataService.uploadProductData from analysisService');
     return productDataService.uploadProductData(file, productName);
   },
   

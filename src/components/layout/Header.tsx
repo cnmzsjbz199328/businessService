@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 export default function Header() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -32,10 +33,13 @@ export default function Header() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
-              BC
-            </div>
-            <span className="text-xl font-bold">Business Consulting</span>
+              <Image
+                src="/ainventory logo.png" // 确保路径正确
+                alt="AIventory Logo"
+                width={200}
+                height={200}
+                priority // 使用priority属性确保徽标快速加载
+              />
           </div>
           
           <button 
