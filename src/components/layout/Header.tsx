@@ -39,6 +39,7 @@ export default function Header() {
                 width={200}
                 height={200}
                 priority // 使用priority属性确保徽标快速加载
+                unoptimized={true}
               />
           </div>
           
